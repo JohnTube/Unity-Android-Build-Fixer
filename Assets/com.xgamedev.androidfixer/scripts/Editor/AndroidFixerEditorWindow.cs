@@ -1,4 +1,4 @@
-﻿using System.Collections;
+﻿using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEditor;
@@ -29,7 +29,7 @@ public class AndroidFixerEditorWindow : EditorWindow {
 	[MenuItem("XGameDev/Android Fixer")]
 	public static void ShowWindow()
 	{
-		EditorWindow.GetWindow(typeof(AndroidFixerEditorWindow));
+		GetWindow(typeof(AndroidFixerEditorWindow));
 	}
 
 	void Update()
@@ -43,12 +43,15 @@ public class AndroidFixerEditorWindow : EditorWindow {
 		{
 			string projectPath = Application.dataPath;
 
-			getAllFilesInDir (projectPath, "*.aar", ref m_aarFiles);
-			getAllFilesInDir (projectPath, "*.jar", ref m_jarFiles);
-			getAllFilesInDir (projectPath, "AndroidManifest.xml", ref m_xmlFiles);
-		}
+            m_aarFiles = getAllFilesInDir(projectPath, "*.aar");
+		    sortFiles(m_aarFiles);
+            m_jarFiles = getAllFilesInDir(projectPath, "*.jar");
+            sortFiles(m_jarFiles);
+            m_xmlFiles = getAllFilesInDir(projectPath, "AndroidManifest.xml");
+            sortFiles(m_xmlFiles);
+        }
 
-		GUILayout.Space (16);
+        GUILayout.Space (16);
 
 		m_showArrFiles = EditorGUILayout.Toggle("Show Aar Files", m_showArrFiles);
 
@@ -56,7 +59,7 @@ public class AndroidFixerEditorWindow : EditorWindow {
 
 		if (m_showArrFiles) {
 
-			if (GUILayout.Button (string.Format("Check conflicts",m_minSDKVersion))) {
+			if (GUILayout.Button ("Check conflicts")) {
 				checkAarFiles ();
 			}
 
@@ -74,7 +77,7 @@ public class AndroidFixerEditorWindow : EditorWindow {
 
 		if (m_showJarFiles) {
 
-			if (GUILayout.Button (string.Format("Check conflicts",m_minSDKVersion))) {
+			if (GUILayout.Button ("Check conflicts")) {
 				checkJarFiles ();
 			}
 
@@ -100,7 +103,7 @@ public class AndroidFixerEditorWindow : EditorWindow {
 
 				for (int i = 0; i < m_xmlFiles.Length; i++) {
 
-					int idx = m_xmlFiles [i].FullName.IndexOf ("Assets");
+					int idx = m_xmlFiles [i].FullName.IndexOf ("Assets", StringComparison.InvariantCultureIgnoreCase);
 
 					string path = m_xmlFiles [i].Name;
 
@@ -109,27 +112,35 @@ public class AndroidFixerEditorWindow : EditorWindow {
 					}
 
 					EditorGUILayout.LabelField (path, EditorStyles.boldLabel);
-					EditorGUILayout.LabelField (string.Format("minSdkVersion {0}",processXml (m_xmlFiles [i].FullName)), EditorStyles.boldLabel);
+					EditorGUILayout.LabelField (string.Format("minSdkVersion {0}", processXml (m_xmlFiles [i].FullName)), EditorStyles.boldLabel);
 				}
 			}
 		}
 	}
 
-	/// <summary>
-	/// Gets all files in dir.
-	/// </summary>
-	/// <param name="dirPath">Dir path.</param>
-	/// <param name="filter">Filter.</param>
-	/// <param name="fileArr">File arr.</param>
-	void getAllFilesInDir(string dirPath, string filter, ref FileInfo[] fileArr){
+    /// <summary>
+    /// Gets all files in dir.
+    /// </summary>
+    /// <param name="dirPath">Dir path.</param>
+    /// <param name="filter">Filter.</param>
+    /// <param name="fileArr">File arr.</param>
+    FileInfo[] getAllFilesInDir(string dirPath, string filter){
 		DirectoryInfo dir = new DirectoryInfo(dirPath);
-		fileArr = dir.GetFiles(filter,SearchOption.AllDirectories);
-
-
+		return dir.GetFiles(filter,SearchOption.AllDirectories);
 	}
 
-	#region AAR
-	private void checkAarFiles(){
+    void sortFiles(FileInfo[] files)
+    {
+        Array.Sort(files, (x, y) => StringComparer.OrdinalIgnoreCase.Compare(x.Name, y.Name));
+    }
+
+    #region AAR
+    private void checkAarFiles()
+	{
+	    if (m_aarFiles == null)
+	    {
+	        return;
+        }
 		Dictionary<string,string> files = new Dictionary<string, string> ();
 
 		for (int i = 0; i < m_aarFiles.Length; i++) {
@@ -152,9 +163,10 @@ public class AndroidFixerEditorWindow : EditorWindow {
 
 	#region JAR
 	private void checkJarFiles(){
-		Dictionary<string,string> files = new Dictionary<string, string> ();
-
-		for (int i = 0; i < m_jarFiles.Length; i++) {
+	    if (m_jarFiles == null)
+	    { return; }
+        Dictionary<string, string> files = new Dictionary<string, string>();
+        for (int i = 0; i < m_jarFiles.Length; i++) {
 			int idx = m_jarFiles [i].Name.LastIndexOf ("-");
 
 			string name = m_jarFiles [i].Name;
@@ -185,15 +197,15 @@ public class AndroidFixerEditorWindow : EditorWindow {
 		XmlDocument doc = new XmlDocument();
 		doc.Load (pathToXml);
 
-		if (doc == null) {
-			return string.Empty;
-		}
-
 		XmlNode root = doc.DocumentElement;
+	    if (root == null)
+	    {
+	        return string.Empty;
+	    }
 
 		XmlNode usesSdkNode = root.SelectSingleNode( "uses-sdk" ); 
 
-		if (usesSdkNode != null) {
+		if (usesSdkNode != null && usesSdkNode.Attributes != null) {
 
 			XmlAttribute att = usesSdkNode.Attributes ["android:minSdkVersion"];
 
@@ -206,10 +218,8 @@ public class AndroidFixerEditorWindow : EditorWindow {
 				}
 
 				return att.Value;
-			} else {
-				return string.Empty;
-			}
-
+			} 
+			return string.Empty;
 			//return usesSdkNode.Attributes ["android:minSdkVersion"].Value;
 		}
 
@@ -217,25 +227,29 @@ public class AndroidFixerEditorWindow : EditorWindow {
 	}
 
 	private void changeMinSdkVersionInXMl(){
-		
+	    if (m_xmlFiles == null)
+	    {
+	        return;
+	    }
 		for (int i = 0; i < m_xmlFiles.Length; i++) {
 
 			XmlDocument doc = new XmlDocument();
 			doc.Load (m_xmlFiles[i].FullName);
 
 			XmlNode root = doc.DocumentElement;
-
+		    if (root == null)
+		    {
+		        return;
+		    }
 			XmlNode usesSdkNode = root.SelectSingleNode( "uses-sdk" ); 
 
-			if (usesSdkNode != null) {
+			if (usesSdkNode != null && usesSdkNode.Attributes != null) {
 
 				XmlAttribute att = usesSdkNode.Attributes ["android:minSdkVersion"];
 
 				if (att != null) {
 
 					att.Value = m_minSDKVersion.ToString ();
-				} else {
-					
 				}
 			}
 
