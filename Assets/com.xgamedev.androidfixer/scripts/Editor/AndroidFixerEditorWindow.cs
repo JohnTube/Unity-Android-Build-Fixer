@@ -32,7 +32,6 @@ public class AndroidFixerEditorWindow : EditorWindow
         GetWindow(typeof(AndroidFixerEditorWindow));
     }
 
-
     void Update()
     {
         Repaint();
@@ -204,7 +203,6 @@ public class AndroidFixerEditorWindow : EditorWindow
         for (int i = 0; i < infiles.Length; i++)
         {
             int idx = infiles[i].Name.LastIndexOf("-", StringComparison.InvariantCultureIgnoreCase);
-
             string name = infiles[i].Name;
             string version;
             if (idx >= 0)
@@ -212,12 +210,34 @@ public class AndroidFixerEditorWindow : EditorWindow
                 version = infiles[i].Name.Substring(idx + 1, name.Length - idx - 1).Replace(infiles[i].Extension, "");
                 if (!checkIfVersion(version))
                 {
-                    Debug.LogFormat("Not a version {0}, n={1}", version, name);
+                    //Debug.LogFormat("Not a version {0}, n={1}", version, name);
                     continue;
                 }
                 name = infiles[i].Name.Substring(0, idx);
             }
-
+            string requiredPathParts = Path.Combine("Plugins", "Android");
+            if (infiles[i].FullName.Contains(requiredPathParts))
+            {
+                requiredPathParts = Path.Combine(requiredPathParts, infiles[i].Name);
+                if (!infiles[i].FullName.EndsWith(requiredPathParts))
+                {
+                    requiredPathParts = Path.Combine("libs", infiles[i].Name);
+                    if (!infiles[i].FullName.EndsWith(requiredPathParts))
+                    {
+                        requiredPathParts = Path.Combine("bin", infiles[i].Name);
+                        if (!infiles[i].FullName.EndsWith(requiredPathParts))
+                        {
+                            Debug.LogWarningFormat("{0} file excluded from build (move to proper folder) {1}", infiles[i].Name, infiles[i].FullName);
+                            continue;
+                        }
+                    }
+                }
+            }
+            else
+            {
+                Debug.LogWarningFormat("{0} file excluded from build (move to proper folder) {1}", infiles[i].Name, infiles[i].FullName);
+                continue;
+            }
             if (!files.ContainsKey(name))
             {
                 files.Add(name, infiles[i].FullName);
